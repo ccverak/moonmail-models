@@ -455,14 +455,14 @@ class Model {
     return false;
   }
 
-  static isValid(object) {
+  static isValid(object, options = {}) {
     debug('= Model.isValid');
-    return this._validateSchema(this.schema, object);
+    return this._validateSchema(this.schema, object, options);
   }
 
-  static _validateSchema(schema, model) {
+  static _validateSchema(schema, model, options = {}) {
     if (!this.schema) return true;
-    const result = Joi.validate(model, schema);
+    const result = Joi.validate(model, schema, options);
     return !result.error;
   }
 

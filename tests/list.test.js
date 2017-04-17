@@ -20,6 +20,16 @@ describe('List', () => {
     tNameStub = sinon.stub(List, 'tableName', { get: () => tableName });
   });
 
+  describe('#isValid', () => {
+    it('succeeds if required attributes are provided', () => {
+      expect(List.isValid({ id: 'some-id', name: 'some-name', userId: 'some-user-id', another: 'attr' })).to.be.true;
+    });
+
+    it('fails if required attributes are missing', () => {
+      expect(List.isValid({ id: 'some-id', userId: 'some-user-id', another: 'attr' })).to.be.false;
+    });
+  });
+
   describe('#get', () => {
     it('calls the DynamoDB get method with correct params', (done) => {
       List.get(userId, listId).then(() => {
