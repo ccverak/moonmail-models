@@ -1,3 +1,4 @@
+import Joi from 'joi';
 import { Model } from './model';
 import { debug } from './../logger';
 
@@ -13,6 +14,19 @@ class List extends Model {
 
   static get rangeKey() {
     return 'id';
+  }
+
+  static get schema() {
+    return Joi.object({
+      id: Joi.string().required(),
+      userId: Joi.string().required(),
+      name: Joi.string().required()
+    });
+  }
+
+  static isValid(object) {
+    debug('= List.isValid');
+    return this._validateSchema(this.schema, object, { allowUnknown: true });
   }
 
   static createFileImportStatus(userId, listId, file, status) {
