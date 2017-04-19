@@ -59,7 +59,8 @@ class Campaign extends Model {
       scheduledAt: Joi.number(),
       status: Joi.string().required(),
       isUpToDate: Joi.boolean(),
-      template: Joi.string()
+      template: Joi.string(),
+      archived: Joi.boolean()
     });
     return this._validateSchema(schema, campaign) && campaign.status === 'draft';
   }
