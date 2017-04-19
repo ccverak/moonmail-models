@@ -27,17 +27,8 @@ describe('Campaign', () => {
     senderId: 'a-sender',
     name: 'some-name',
     id: 'some-id',
-    status: 'draft'
-  };
-  const notReadyToSentCampaign = {
-    userId: 'user-id',
-    body: 'a-body',
-    subject: 'a-subject',
-    listIds: ['a-list'],
-    senderId: 'a-sender',
-    name: 'some-name',
-    id: 'some-id',
-    status: 'pending'
+    status: 'draft',
+    archived: false
   };
   const incompleteCampaign = {
     userId: 'user-id',
@@ -174,7 +165,7 @@ describe('Campaign', () => {
     });
   });
 
-  describe('#isReadyToBeSent', () => {
+  describe('#isValidToBeSent', () => {
     it('succeds if all required fields are valid', () => {
       expect(Campaign.isValidToBeSent(readyToSentCampaign)).to.be.true;
     });
