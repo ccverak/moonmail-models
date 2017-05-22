@@ -1,16 +1,16 @@
 import { Model } from './model';
 
-class Automation extends Model {
+class AutomationAction extends Model {
   static get tableName() {
-    return process.env.AUTOMATIONS_TABLE;
+    return process.env.AUTOMATION_ACTIONS_TABLE;
   }
 
   static get footprintStatusIndex() {
     return process.env.FOOTPRINT_STATUS_INDEX_NAME;
   }
 
-  static get serieIndex() {
-    return process.env.SERIE_INDEX_NAME;
+  static get automationIndex() {
+    return process.env.AUTOMATION_INDEX_NAME;
   }
 
   static get hashKey() {
@@ -30,4 +30,4 @@ class Automation extends Model {
   }
 }
 
-module.exports.Automation = Automation;
+module.exports.AutomationAction = AutomationAction;
