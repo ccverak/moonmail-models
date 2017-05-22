@@ -11,5 +11,6 @@ export * from './models/sender';
 export * from './models/list';
 export * from './models/recipient';
 export * from './models/email_template';
+export * from './models/automation';
 export * from './models/automation_action';
 export * from './models/scheduled_email';
