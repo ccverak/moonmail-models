@@ -8,11 +8,11 @@ class ScheduledEmail extends Model {
   }
 
   static get hashKey() {
-    return 'id';
+    return 'automationActionId';
   }
 
   static get rangeKey() {
-    return 'scheduledAt';
+    return 'id';
   }
 
   static toBeSent() {
