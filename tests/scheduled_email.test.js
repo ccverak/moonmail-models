@@ -14,8 +14,8 @@ describe('ScheduledEmail', () => {
   const tableName = 'scheduledEmails-table';
   const scheduledEmailId = 'scheduledEmailId';
   let tNameStub;
-  const scheduledEmailHashKey = 'id';
-  const scheduledEmailRangeKey = 'scheduledAt';
+  const scheduledEmailHashKey = 'automationActionId';
+  const scheduledEmailRangeKey = 'id';
   const id = 'some-id';
   const scheduledAt = 12345;
 
