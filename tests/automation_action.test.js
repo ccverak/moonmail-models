@@ -15,9 +15,9 @@ describe('AutomationAction', () => {
   const footprintStatusIndexName = 'footprint-status-index';
   const automationIndexName = 'automation-index';
   const automationActionId = 'automationActionId';
-  const userId = 'thatUserId';
+  const automationId = 'thatUserId';
   let tNameStub;
-  const automationActionHashKey = 'userId';
+  const automationActionHashKey = 'automationId';
   const automationActionRangeKey = 'id';
 
   before(() => {
@@ -29,10 +29,10 @@ describe('AutomationAction', () => {
 
   describe('#get', () => {
     it('calls the DynamoDB get method with correct params', done => {
-      AutomationAction.get(userId, automationActionId).then(() => {
+      AutomationAction.get(automationId, automationActionId).then(() => {
         const args = AutomationAction._client.lastCall.args;
         expect(args[0]).to.equal('get');
-        expect(args[1]).to.have.deep.property(`Key.${automationActionHashKey}`, userId);
+        expect(args[1]).to.have.deep.property(`Key.${automationActionHashKey}`, automationId);
         expect(args[1]).to.have.deep.property(`Key.${automationActionRangeKey}`, automationActionId);
         expect(args[1]).to.have.property('TableName', tableName);
         done();
