@@ -14,7 +14,7 @@ class AutomationAction extends Model {
   }
 
   static get hashKey() {
-    return 'userId';
+    return 'automationId';
   }
 
   static get rangeKey() {
