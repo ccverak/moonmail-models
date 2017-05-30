@@ -1,6 +1,11 @@
 import Joi from 'joi';
 import { Model } from './model';
 
+const conditionTypes = {
+  subscriptionOrigin: 'subscriptionOrigin',
+  subscriptionDate: 'subscriptionDate'
+};
+
 class ListSegment extends Model {
 
   static get tableName() {
