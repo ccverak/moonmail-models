@@ -9,6 +9,12 @@ const statuses = {
   complaint: 'complained'
 };
 
+const subscriptionOrigins = {
+  signupForm: 'signupForm',
+  listImport: 'listImport',
+  manual: 'manual'
+};
+
 class Recipient extends Model {
 
   static get tableName() {
@@ -38,7 +44,7 @@ class Recipient extends Model {
   static emailBeginsWith(listId, email, options = {}) {
     const indexOptions = {
       indexName: this.emailIndex,
-      range: {bw: {email}}
+      range: { bw: { email } }
     };
     const dbOptions = Object.assign({}, indexOptions, options);
     return this.allBy(this.hashKey, listId, dbOptions);
@@ -47,7 +53,7 @@ class Recipient extends Model {
   static allByStatus(listId, status, options = {}) {
     const indexOptions = {
       indexName: this.statusIndex,
-      range: {eq: {status}}
+      range: { eq: { status } }
     };
     const dbOptions = Object.assign({}, indexOptions, options);
     return this.allBy(this.hashKey, listId, dbOptions);
