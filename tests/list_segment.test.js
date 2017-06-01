@@ -48,7 +48,13 @@ describe('ListSegment', () => {
           userId: 'user-id',
           conditionMatch: 'any',
           conditions: [
-            { conditionType: 'subscription-origin', condition: { op: 'eq', field: 'country', value: 'ES' } }
+            {
+              conditionType: 'subscription-origin', condition: {
+                type: 'range',
+                field: 'age',
+                data: { gte: 29, lt: 50 }
+              }
+            }
           ]
         }).then(() => {
           expect(ListSegment._client).to.have.been.called;
