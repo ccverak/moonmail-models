@@ -13,7 +13,7 @@ describe('ListSegment', () => {
   const rangeKey = 'id';
   let tNameStub;
 
-  before(() => {
+  beforeEach(() => {
     sinon.stub(ListSegment, '_client').resolves(true);
     tNameStub = sinon.stub(ListSegment, 'tableName', { get: () => tableName });
   });
@@ -33,14 +33,15 @@ describe('ListSegment', () => {
   describe('#save', () => {
     context('when the item is not valid', () => {
       it('rejects and returns', (done) => {
-        ListSegment.save({ listId: '1', id: '2' }).catch(() => {
+        ListSegment.save({ listId: '1', id: '2' }).catch((err) => {
+          expect(err).to.exist;
           expect(ListSegment._client).not.to.have.been.called;
           done();
         });
       });
     });
     context('when the item is valid', () => {
-      it('saves it', (done) => {
+      it('saves the item', (done) => {
         ListSegment.save({
           listId: '1',
           id: '2',
@@ -64,7 +65,37 @@ describe('ListSegment', () => {
     });
   });
 
-  after(() => {
+  describe('#update', () => {
+    context('when the conditions are invalid', () => {
+      it('rejects and returns', (done) => {
+        ListSegment.update({ conditions: [] }, hashKey, rangeKey).catch((err) => {
+          expect(err).to.exist;
+          expect(ListSegment._client).not.to.have.been.called;
+          done();
+        });
+      });
+    });
+    context('when the conditions are valid', () => {
+      it('performs the update', (done) => {
+        ListSegment.update({
+          conditions: [
+            {
+              conditionType: 'subscription-origin', condition: {
+                type: 'range',
+                field: 'age',
+                data: { gte: 29, lt: 50 }
+              }
+            }
+          ]
+        }, hashKey, rangeKey).then(() => {
+          expect(ListSegment._client).to.have.been.called;
+          done();
+        });
+      });
+    });
+  });
+
+  afterEach(() => {
     ListSegment._client.restore();
     tNameStub.restore();
   });
