@@ -1,6 +1,11 @@
 import Joi from 'joi';
 import { Model } from './model';
 
+const conditionTypes = {
+  subscriptionOrigin: 'subscriptionOrigin',
+  subscriptionDate: 'subscriptionDate'
+};
+
 class ListSegment extends Model {
 
   static get tableName() {
@@ -25,9 +30,9 @@ class ListSegment extends Model {
       conditions: Joi.array().items(Joi.object().keys({
         conditionType: Joi.string().required(),
         condition: Joi.object().keys({
-          op: Joi.string().required(),
+          type: Joi.string().required(),
           field: Joi.string().required(),
-          value: Joi.any().required()
+          data: Joi.any().required()
         })
       })).min(1)
     });
