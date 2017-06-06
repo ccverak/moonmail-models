@@ -27,6 +27,7 @@ class ListSegment extends Model {
       id: Joi.string().required(),
       userId: Joi.string().required(),
       name: Joi.string().required(),
+      archived: Joi.boolean().default(false),
       conditionMatch: Joi.string().default('all'),
       conditions: this.conditionsSchema
     });
