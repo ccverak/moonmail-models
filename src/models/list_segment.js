@@ -21,6 +21,10 @@ class ListSegment extends Model {
     return 'id';
   }
 
+  static get conditionTypes() {
+    return conditionTypes;
+  }
+
   static get schema() {
     return Joi.object({
       listId: Joi.string().required(),
