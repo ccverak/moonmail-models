@@ -41,6 +41,10 @@ class Recipient extends Model {
     return statuses;
   }
 
+  static get subscriptionOrigins() {
+    return subscriptionOrigins;
+  }
+
   static emailBeginsWith(listId, email, options = {}) {
     const indexOptions = {
       indexName: this.emailIndex,
