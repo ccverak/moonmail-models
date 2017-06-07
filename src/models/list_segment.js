@@ -39,11 +39,11 @@ class ListSegment extends Model {
 
   static get conditionsSchema() {
     return Joi.array().items(Joi.object().keys({
-      conditionType: Joi.string().required(),
+      conditionType: Joi.string().default('filter'),
       condition: Joi.object().keys({
-        type: Joi.string().required(),
-        field: Joi.string().required(),
-        data: Joi.any().required()
+        queryType: Joi.string().required(),
+        fieldToQuery: Joi.string().required(),
+        searchTerm: Joi.any().required()
       })
     })).min(1);
   }
