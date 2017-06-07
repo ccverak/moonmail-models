@@ -50,10 +50,10 @@ describe('ListSegment', () => {
           conditionMatch: 'any',
           conditions: [
             {
-              conditionType: 'subscription-origin', condition: {
-                type: 'range',
-                field: 'age',
-                data: { gte: 29, lt: 50 }
+              conditionType: 'filter', condition: {
+                queryType: 'range',
+                fieldToQuery: 'age',
+                searchTerm: { gte: 29, lt: 50 }
               }
             }
           ]
@@ -80,10 +80,10 @@ describe('ListSegment', () => {
         ListSegment.update({
           conditions: [
             {
-              conditionType: 'subscription-origin', condition: {
-                type: 'range',
-                field: 'age',
-                data: { gte: 29, lt: 50 }
+              conditionType: 'filter', condition: {
+                queryType: 'range',
+                fieldToQuery: 'age',
+                searchTerm: { gte: 29, lt: 50 }
               }
             }
           ]
