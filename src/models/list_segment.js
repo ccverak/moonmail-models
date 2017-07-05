@@ -55,9 +55,17 @@ class ListSegment extends Model {
 
   static update(params, hash, range) {
     if (params.conditions) {
-      if (!this._validateSchema(this.conditionsSchema, params.conditions)) return Promise.reject("List segment's conditions are invalid");
+      return this.validateConditions(params.conditions)
+        .then(() => super.update(params, hash, range));
     }
-    return super.update(params, hash, range);
+  }
+
+  static validConditions(conditions) {
+    return this._validateSchema(this.conditionsSchema, conditions);
+  }
+
+  static validateConditions(conditions) {
+    return this.validConditions(conditions) ? Promise.resolve(conditions) : Promise.reject("List segment's conditions are invalid");
   }
 }
 
