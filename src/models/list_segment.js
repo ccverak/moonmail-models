@@ -50,7 +50,7 @@ class ListSegment extends Model {
 
   static save(item) {
     if (this.isValid(item, { allowUnknown: true })) return super.save(item);
-    return Promise.reject(new Error('ListSegment is not valid, you miss required attributes'));
+    return Promise.reject({ name: 'ListSegmentError', type: 'InvalidSegment', message: 'provided object is not valid' });
   }
 
   static update(params, hash, range) {
@@ -65,7 +65,7 @@ class ListSegment extends Model {
   }
 
   static validateConditions(conditions) {
-    return this.validConditions(conditions) ? Promise.resolve(conditions) : Promise.reject("List segment's conditions are invalid");
+    return this.validConditions(conditions) ? Promise.resolve(conditions) : Promise.reject({ name: 'ListSegmentError', type: 'InvalidConditions', message: 'provided object is not valid' });
   }
 }
 
