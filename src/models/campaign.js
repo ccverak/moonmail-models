@@ -35,6 +35,7 @@ class Campaign extends Model {
       id: Joi.string().required(),
       senderId: Joi.string(),
       listIds: Joi.array(),
+      segmentId: Joi.string(),
       sentAt: Joi.number(),
       createdAt: Joi.number(),
       scheduledAt: Joi.number(),
@@ -78,27 +79,27 @@ class Campaign extends Model {
         TableName: this.tableName,
         IndexName: this.sentAtIndex,
         KeyConditionExpression: 'userId = :userId and sentAt > :lastDays',
-        ExpressionAttributeValues: {':lastDays': lastMonthTimestamp, ':userId': userId},
+        ExpressionAttributeValues: { ':lastDays': lastMonthTimestamp, ':userId': userId },
         Select: 'COUNT'
       };
       return this._client('query', params).then(result => resolve(result.Count))
-          .catch(err => reject(err));
+        .catch(err => reject(err));
     });
   }
 
   static sentBy(userId, options = {}) {
     return new Promise((resolve, reject) => {
       debug('= Campaign.sentBy', userId);
-      const filterOptions = {filters: {status: {eq: 'sent'}}};
+      const filterOptions = { filters: { status: { eq: 'sent' } } };
       const sentByOptions = deepAssign(options, filterOptions);
       return this.allBy('userId', userId, sentByOptions).then(result => resolve(result))
-          .catch(err => reject(err));
+        .catch(err => reject(err));
     });
   }
 
   static schedule(userId, campaignId, scheduledAt) {
     debug('= Campaign.schedule', userId, campaignId, scheduledAt);
-    const params = {scheduledAt, status: 'scheduled'};
+    const params = { scheduledAt, status: 'scheduled' };
     return this.update(params, userId, campaignId);
   }
 
@@ -113,11 +114,11 @@ class Campaign extends Model {
           '#status': 'status',
           '#scheduledAt': 'scheduledAt'
         },
-        ExpressionAttributeValues: {':status': 'draft'},
+        ExpressionAttributeValues: { ':status': 'draft' },
         ReturnValues: 'ALL_NEW'
       };
       return this._client('update', params).then(result => resolve(result.Attributes))
-          .catch(err => reject(err));
+        .catch(err => reject(err));
     });
   }
 
@@ -137,7 +138,7 @@ class Campaign extends Model {
         }
       };
       return this._client('scan', params).then(result => resolve(result.Items))
-          .catch(err => reject(err));
+        .catch(err => reject(err));
     });
   }
 }
