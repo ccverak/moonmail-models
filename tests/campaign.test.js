@@ -30,6 +30,17 @@ describe('Campaign', () => {
     status: 'draft',
     archived: false
   };
+  const readyToSentCampaign2 = {
+    userId: 'user-id',
+    body: 'a-body',
+    subject: 'a-subject',
+    segmentId: 'a-seg',
+    senderId: 'a-sender',
+    name: 'some-name',
+    id: 'some-id',
+    status: 'draft',
+    archived: false
+  };
   const incompleteCampaign = {
     userId: 'user-id',
     body: 'a-body',
@@ -45,10 +56,10 @@ describe('Campaign', () => {
   };
 
   before(() => {
-    sinon.stub(Campaign, '_client').resolves({Items: []});
-    tNameStub = sinon.stub(Campaign, 'tableName', { get: () => tableName});
-    tNameStub = sinon.stub(Campaign, 'sentAtIndex', { get: () => sentAtIndexName});
-    tNameStub = sinon.stub(Campaign, 'scheduledAtIndex', { get: () => scheduledAtIndexName});
+    sinon.stub(Campaign, '_client').resolves({ Items: [] });
+    tNameStub = sinon.stub(Campaign, 'tableName', { get: () => tableName });
+    tNameStub = sinon.stub(Campaign, 'sentAtIndex', { get: () => sentAtIndexName });
+    tNameStub = sinon.stub(Campaign, 'scheduledAtIndex', { get: () => scheduledAtIndexName });
   });
 
   describe('#get', () => {
@@ -87,7 +98,7 @@ describe('Campaign', () => {
     it('should update the campaign\'s status and scheduledAt', done => {
       const scheduleAt = 1234;
       Campaign.schedule(userId, campaignId, scheduleAt).then(() => {
-        const expectedParams = {scheduledAt: scheduleAt, status: 'scheduled'};
+        const expectedParams = { scheduledAt: scheduleAt, status: 'scheduled' };
         expect(Campaign.update).to.have.been.calledWith(expectedParams, userId, campaignId);
         done();
       }).catch(done);
@@ -149,7 +160,7 @@ describe('Campaign', () => {
         expect(args[1]).to.have.deep.property('ExpressionAttributeNames.#status', 'status');
         done();
       })
-      .catch(err => done(err));
+        .catch(err => done(err));
     });
   });
 
@@ -168,6 +179,7 @@ describe('Campaign', () => {
   describe('#isValidToBeSent', () => {
     it('succeds if all required fields are valid', () => {
       expect(Campaign.isValidToBeSent(readyToSentCampaign)).to.be.true;
+      expect(Campaign.isValidToBeSent(readyToSentCampaign2)).to.be.true;
     });
 
     it('fails if required fields are missing', () => {
