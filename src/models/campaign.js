@@ -47,22 +47,42 @@ class Campaign extends Model {
 
   static isValidToBeSent(campaign) {
     debug('= Campaign.isValidToBeSent', campaign);
-    const schema = Joi.object({
-      userId: Joi.string().required(),
-      id: Joi.string().required(),
-      body: Joi.string().required(),
-      subject: Joi.string().required(),
-      listIds: Joi.array().items(Joi.string().required()).required(),
-      name: Joi.string().required(),
-      senderId: Joi.string(),
-      sentAt: Joi.number(),
-      createdAt: Joi.number(),
-      scheduledAt: Joi.number(),
-      status: Joi.string().regex(/^scheduled|draft$/).required(),
-      isUpToDate: Joi.boolean(),
-      template: Joi.string(),
-      archived: Joi.boolean()
-    });
+    const schema = Joi.alternatives().try(
+      Joi.object({
+        userId: Joi.string().required(),
+        id: Joi.string().required(),
+        body: Joi.string().required(),
+        subject: Joi.string().required(),
+        listIds: Joi.array().items(Joi.string().required()).required(),
+        segmentGId: Joi.string(),
+        name: Joi.string().required(),
+        senderId: Joi.string(),
+        sentAt: Joi.number(),
+        createdAt: Joi.number(),
+        scheduledAt: Joi.number(),
+        status: Joi.string().regex(/^scheduled|draft$/).required(),
+        isUpToDate: Joi.boolean(),
+        template: Joi.string(),
+        archived: Joi.boolean()
+      }),
+      Joi.object({
+        userId: Joi.string().required(),
+        id: Joi.string().required(),
+        body: Joi.string().required(),
+        subject: Joi.string().required(),
+        listIds: Joi.array(),
+        segmentGId: Joi.string().required(),
+        name: Joi.string().required(),
+        senderId: Joi.string(),
+        sentAt: Joi.number(),
+        createdAt: Joi.number(),
+        scheduledAt: Joi.number(),
+        status: Joi.string().regex(/^scheduled|draft$/).required(),
+        isUpToDate: Joi.boolean(),
+        template: Joi.string(),
+        archived: Joi.boolean()
+      })
+    );
     return this._validateSchema(schema, campaign);
   }
 

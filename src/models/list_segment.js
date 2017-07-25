@@ -29,6 +29,7 @@ class ListSegment extends Model {
     return Joi.object({
       listId: Joi.string().required(),
       id: Joi.string().required(),
+      gid: Joi.string(),
       userId: Joi.string().required(),
       name: Joi.string().required(),
       archived: Joi.boolean().default(false),
