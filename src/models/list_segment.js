@@ -13,6 +13,10 @@ class ListSegment extends Model {
     return process.env.LIST_SEGMENTS_TABLE;
   }
 
+  static get segmentIdIndex() {
+    return process.env.LIST_SEGMENT_ID_INDEX_NAME;
+  }
+
   static get hashKey() {
     return 'listId';
   }
@@ -67,6 +71,14 @@ class ListSegment extends Model {
 
   static validateConditions(conditions) {
     return this.validConditions(conditions) ? Promise.resolve(conditions) : Promise.reject({ name: 'ListSegmentError', type: 'InvalidConditions', message: 'provided object is not valid' });
+  }
+
+  static getBySegmentId(segmentId) {
+    const options = {
+      indexName: this.segmentIdIndex
+    };
+    return this.allBy('id', segmentId, options)
+      .then(result => result.items.pop());
   }
 }
 

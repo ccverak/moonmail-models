@@ -34,7 +34,7 @@ describe('Campaign', () => {
     userId: 'user-id',
     body: 'a-body',
     subject: 'a-subject',
-    segmentGId: 'a-seg',
+    segmentId: 'a-seg',
     senderId: 'a-sender',
     name: 'some-name',
     id: 'some-id',
