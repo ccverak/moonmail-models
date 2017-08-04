@@ -29,6 +29,10 @@ class Recipient extends Model {
     return process.env.RECIPIENT_STATUS_INDEX_NAME;
   }
 
+  static get globalEmailIndex() {
+    return process.env.RECIPIENT_GLOBAL_EMAIL_INDEX_NAME;
+  }
+
   static get hashKey() {
     return 'listId';
   }
@@ -61,6 +65,14 @@ class Recipient extends Model {
     };
     const dbOptions = Object.assign({}, indexOptions, options);
     return this.allBy(this.hashKey, listId, dbOptions);
+  }
+
+  static allByEmail(email, options = {}) {
+    const indexOptions = {
+      indexName: this.globalEmailIndex,
+    };
+    const dbOptions = Object.assign({}, indexOptions, options);
+    return this.allBy('email', email, dbOptions);
   }
 }
 
