@@ -18,6 +18,10 @@ class Campaign extends Model {
     return process.env.SCHEDULED_AT_INDEX_NAME;
   }
 
+  static get archivedIndex() {
+    return process.env.ARCHIVED_INDEX_NAME;
+  }
+
   static get hashKey() {
     return 'userId';
   }
@@ -113,6 +117,16 @@ class Campaign extends Model {
       const filterOptions = { filters: { status: { eq: 'sent' } } };
       const sentByOptions = deepAssign(options, filterOptions);
       return this.allBy('userId', userId, sentByOptions).then(result => resolve(result))
+        .catch(err => reject(err));
+    });
+  }
+
+  static allByArchiveStatus(userId, options = {}) {
+    return new Promise((resolve, reject) => {
+      debug('= Campaign.archived', userId);
+      const defaultOptions = { IndexName: this.archivedIndex };
+      const archivedOptions = deepAssign(defaultOptions, options);
+      return this.allBy('userId', userId, archivedOptions).then(result => resolve(result))
         .catch(err => reject(err));
     });
   }
