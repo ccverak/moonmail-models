@@ -63,6 +63,7 @@ class ListSegment extends Model {
       return this.validateConditions(params.conditions)
         .then(() => super.update(params, hash, range));
     }
+    return super.update(params, hash, range);
   }
 
   static validConditions(conditions) {
