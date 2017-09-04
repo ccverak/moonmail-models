@@ -71,7 +71,7 @@ class ListSegment extends Model {
   }
 
   static validateConditions(conditions) {
-    return this.validConditions(conditions) ? Promise.resolve(conditions) : Promise.reject({ name: 'ListSegmentError', type: 'InvalidConditions', message: 'provided object is not valid' });
+    return this.validConditions(conditions) ? Promise.resolve(conditions) : Promise.reject(new Error('ListSegmentValidationError'));
   }
 
   static getBySegmentId(segmentId) {
