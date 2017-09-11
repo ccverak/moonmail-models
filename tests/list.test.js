@@ -1,11 +1,13 @@
-import * as chai from 'chai';
+import chai from 'chai';
 const expect = chai.expect;
-const chaiAsPromised = require('chai-as-promised');
+import chaiAsPromised from 'chai-as-promised';
 import * as sinon from 'sinon';
-import * as sinonAsPromised from 'sinon-as-promised';
+import 'sinon-as-promised';
+import sinonChai from 'sinon-chai';
 import { List } from '../src/models/list';
 
 chai.use(chaiAsPromised);
+chai.use(sinonChai);
 
 describe('List', () => {
   const tableName = 'Lists-table';
@@ -93,6 +95,43 @@ describe('List', () => {
         expect(args[1].ExpressionAttributeValues).to.deep.equals({ ':newStatus': 'failed', ':newDate': '9898789798', ':importingValue': true });
         done();
       });
+    });
+  });
+
+  describe('#appendMetadataAttributes', () => {
+    beforeEach(() => sinon.spy(List, 'update'));
+    afterEach(() => List.update.restore());
+
+    it('should append attribute names to metadataAttributes property', done => {
+      const suite = [
+        {
+          input: [['the', 'new', 'attributes'],
+            {list: {id: 123, userId: 456}}],
+          expected: [{metadataAttributes: ['the', 'new', 'attributes']}, 456, 123]
+        },
+        {
+          input: [['the', 'new', 'attributes'],
+            {list: {id: 123, userId: 456, metadataAttributes: ['existing', 'attributes']}}],
+          expected: [{metadataAttributes: ['existing', 'attributes', 'the', 'new']}, 456, 123]
+        }
+      ];
+      const promises = suite.map(testCase => {
+        return List.appendMetadataAttributes(...testCase.input)
+          .then(_ => expect(List.update).to.have.been.calledWithExactly(...testCase.expected));
+      });
+      return Promise.all(promises)
+        .then(_ => done())
+        .catch(done);
+    });
+
+    it('should not save if attributes do not vary', done => {
+      const testCaseInput = [['existing', 'attributes'], {list: {metadataAttributes: ['existing', 'attributes']}}];
+      List.appendMetadataAttributes(...testCaseInput)
+        .then(_ => {
+          expect(List.update).not.to.have.been.called;
+          done();
+        })
+        .catch(done);
     });
   });
 
