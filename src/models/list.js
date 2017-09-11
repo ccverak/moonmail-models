@@ -73,6 +73,17 @@ class List extends Model {
     };
     return this._client('update', addParams);
   }
+
+  static appendMetadataAttributes(metadataAttributes = [], {listId, userId, list}) {
+    return (list ? Promise.resolve(list) : List.get(userId, listId))
+      .then(emailList => {
+        const oldMetadata = emailList.metadataAttributes || [];
+        const newMetadata = [...new Set(oldMetadata.concat(metadataAttributes))];
+        return (oldMetadata.length < newMetadata.length)
+          ? List.update({metadataAttributes: newMetadata}, emailList.userId, emailList.id)
+          : emailList;
+      });
+  }
 }
 
 module.exports.List = List;
