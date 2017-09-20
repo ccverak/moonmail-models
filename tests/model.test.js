@@ -201,57 +201,6 @@ describe('Model', () => {
       });
     });
 
-    describe('#filterBy', () => {
-      const options = {
-        limit: 10
-      };
-      const filters = {
-        attr: { eq: '1' }
-      };
-      const lastResult = {
-        Items: [{ id: 'myKey', attr: 1 }, { id: 'myKey', attr: 2 }]
-      }
-      const secondResult = Object.assign({}, lastResult, {
-        LastEvaluatedKey: {
-          id: 'third-id'
-        }
-      });
-
-      const firstResult = Object.assign({}, lastResult, {
-        LastEvaluatedKey: {
-          id: 'second-id'
-        }
-      });
-
-      before(() => {
-        sinon.stub(Model, '_getAllBy')
-          .onFirstCall()
-          .resolves(firstResult)
-          .onSecondCall()
-          .resolves(secondResult)
-          .onThirdCall()
-          .resolves(lastResult);
-      });
-
-      it('recursively filters by the given conditions', (done) => {
-        Model.filterBy(hashKey, hashValue, options, filters).then((results) => {
-          const firstCallArgs = Model._getAllBy.firstCall.args;
-          const secondCallArgs = Model._getAllBy.secondCall.args;
-          const thirdCallArgs = Model._getAllBy.thirdCall.args;
-          expect(firstCallArgs[2]).to.deep.equal(Object.assign({}, options, { filters }));
-          expect(secondCallArgs[2]).to.deep.equal(Object.assign({}, options, { filters }, { page: Model.nextPage(firstResult.LastEvaluatedKey) }));
-          expect(thirdCallArgs[2]).to.deep.equal(Object.assign({}, options, { filters }, { page: Model.nextPage(secondResult.LastEvaluatedKey) }));
-          expect(results).to.have.property('items');
-          expect(results.items.length).to.equal(6);
-          done();
-        }).catch(done);
-      });
-
-      after(() => {
-        Model._getAllBy.restore();
-      });
-    });
-
     describe('#allBy', () => {
       const value = 'value';
 
@@ -371,6 +320,54 @@ describe('Model', () => {
             done();
           }).catch(done);
         });
+      });
+
+      context('when recusrive option was provided', () => {
+          const firstResult = {
+            items: [{ id: 'myKey1', attr: 1 }, { id: 'myKey2', attr: 2 }],
+            nextPage: '2'
+          };
+
+          const secondResult = {
+            items: [{ id: 'myKey3', attr: 3 }, { id: 'myKey4', attr: 4 }],
+            nextPage: '3'
+          };
+
+          const lastResult = {
+            items: [{ id: 'myKey5', attr: 5 }, { id: 'myKey6', attr: 6 }]
+          };
+
+          beforeEach(() => {
+            sinon.stub(Model, '_allBy')
+              .onFirstCall()
+              .resolves(firstResult)
+              .onSecondCall()
+              .resolves(secondResult)
+              .onThirdCall()
+              .resolves(lastResult);
+          });
+
+          it('iterates recursively over the pages', (done) => {
+            Model.allBy(null, value, { recursive: true }).then((results) => {
+              expect(Model._allBy).to.have.been.calledThrice;
+              expect(results).to.have.property('items');
+              expect(results.items.length).to.equal(6);
+              done();
+            }).catch(err => done(err));
+          });
+
+          it('iterates recursively over the pages respecting the limit', (done) => {
+            Model.allBy(null, value, { recursive: true, limit: 5 }).then((results) => {
+              expect(Model._allBy).to.have.been.calledThrice;
+              expect(results).to.have.property('items');
+              expect(results.items.length).to.equal(5);
+              done();
+            }).catch(err => done(err));
+          });
+
+          afterEach(() => {
+            Model._allBy.restore();
+          });
       });
     });
 

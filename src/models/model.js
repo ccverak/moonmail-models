@@ -201,36 +201,6 @@ class Model {
     });
   }
 
-  static filterBy(key, value, opts, filters) {
-    debug('= Model.filterBy', key, value, opts, filters);
-    const options = omitEmpty(Object.assign({}, opts, { filters }));
-    return this._getAllBy(key, value, options)
-      .then((resultSet) => this._recursiveFilterBy(key, value, options, 40, resultSet))
-      .then((resultSet) => {
-        const size = Math.min(options.limit, resultSet.Items.length);
-        const toReturn = Object.assign({}, resultSet, { Items: resultSet.Items.slice(0, size) });
-        // Build response
-        const params = this._buildDynamodDBParams(key, value, options);
-        const response = this._buildResponse(toReturn, params, options);
-        return Promise.resolve(response);
-      }).catch(err => Promise.reject(err));
-  }
-
-
-  static _recursiveFilterBy(key, value, options, iterations, results) {
-    debug('= Model._recursiveFilterBy', key, value, options, iterations, results);
-    if (!results.LastEvaluatedKey) return Promise.resolve(results);
-    if (results.Items.length >= options.limit) return Promise.resolve(results);
-    if (iterations <= 0) return Promise.resolve(results);
-    return this._getAllBy(key, value, Object.assign({}, options, { page: this.nextPage(results.LastEvaluatedKey) }))
-      .then((resultSet) => {
-        const aggregatedResults = Object.assign({}, resultSet,
-          { Items: [...results.Items, ...resultSet.Items] });
-        return this._recursiveFilterBy(key, value, options, iterations - 1, aggregatedResults);
-      });
-  }
-
-
   static _getAllBy(key, value, options = {}) {
     return new Promise((resolve) => {
       // If we are in presence of a query for GSI
@@ -240,13 +210,13 @@ class Model {
       if (key !== this.hashKey) {
         options.gsiHashKey = key;
       }
-      const params = this._buildDynamodDBParams(key, value, options);
+      const params = this._buildDynamoDBParams(key, value, options);
       debug('= Model._getAllBy', key, value, options);
       resolve(this._client('query', params));
     });
   }
 
-  static _buildDynamodDBParams(key, value, options) {
+  static _buildDynamoDBParams(key, value, options) {
     const params = {
       TableName: this.tableName,
       ScanIndexForward: this.scanForward
@@ -257,14 +227,41 @@ class Model {
   }
 
   static allBy(key, value, options = {}) {
+    if (!options.recursive) return this._allBy(key, value, options);
+    delete options.recursive;
+    return this._allBy(key, value, options)
+      .then((resultSet) => {
+        return this._recursiveAllBy(key, value, options, resultSet)
+          .then((resultSet) => {
+            const size = Math.min(options.limit || Number.MAX_SAFE_INTEGER, resultSet.items.length);
+            const toReturn = Object.assign({}, resultSet, { items: resultSet.items.slice(0, size) });
+            return Promise.resolve(toReturn);
+          });
+      }).catch(e => Promise.reject(e));
+  }
+
+  static _allBy(key, value, options = {}) {
     return new Promise((resolve, reject) => {
       debug('= Model.allBy', key, value);
-      const params = this._buildDynamodDBParams(key, value, options);
+      const params = this._buildDynamoDBParams(key, value, options);
       this._getAllBy(key, value, options).then((result) => {
         const response = this._buildResponse(result, params, options);
         resolve(response);
       }).catch(err => reject(err));
     });
+  }
+
+  static _recursiveAllBy(key, value, options, results) {
+    debug('= Model._recursiveAllBy', key, value, options, results);
+    if (!results.nextPage) return Promise.resolve(results);
+    if (options.limit) {
+      if (results.items.length >= options.limit) return Promise.resolve(results);
+    }
+    return this._allBy(key, value, Object.assign({}, options, { page: results.nextPage }))
+      .then((resultSet) => {
+        const aggregatedResults = Object.assign({}, resultSet, { items: [...results.items, ...resultSet.items] });
+        return this._recursiveAllBy(key, value, options, aggregatedResults);
+      });
   }
 
   static _buildKeyParams(key, hash, options = {}) {
