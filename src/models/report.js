@@ -11,6 +11,10 @@ class Report extends Model {
     return 'campaignId';
   }
 
+  static get userIndex() {
+    return process.env.USER_REPORT_INDEX_NAME;
+  }
+
   static incrementBounces(hash, count = 1) {
     debug('= Report.incrementBounces', hash);
     return this.increment('bouncesCount', count, hash);
