@@ -11,11 +11,14 @@ describe('Report', () => {
   const tableName = 'Reports-table';
   const campaignId = 'campaignId';
   let tNameStub;
+  let iNameStub;
   const reportHashKey = 'campaignId';
+  const reportUserIndex = 'user-report-index';
 
   before(() => {
     sinon.stub(Report, '_client').resolves(true);
     tNameStub = sinon.stub(Report, 'tableName', { get: () => tableName});
+    iNameStub = sinon.stub(Report, 'userIndex', { get: () => reportUserIndex});
   });
 
   describe('#get', () => {
@@ -140,8 +143,30 @@ describe('Report', () => {
     });
   });
 
+  describe('#allByUser', () => {
+    const stubResult = 'some-result';
+
+    before(() => {
+      sinon.stub(Report, 'allBy').resolves(stubResult);
+    });
+    after(() => {
+      Report.allBy.restore();
+    });
+
+    it('calls the DynamoDB get method with correct params', (done) => {
+      const userId = 'whatever';
+      Report.allByUser(userId).then(result => {
+        const expectedOptions = {indexName: Report.userIndex};
+        expect(Report.allBy).to.have.been.calledWithExactly('userId', userId, expectedOptions);
+        expect(result).to.equal(stubResult);
+        done();
+      }).catch(done);
+    });
+  });
+
   after(() => {
     Report._client.restore();
     tNameStub.restore();
+    iNameStub.restore();
   });
 });
