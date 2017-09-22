@@ -15,6 +15,12 @@ class Report extends Model {
     return process.env.USER_REPORT_INDEX_NAME;
   }
 
+  static allByUser(userId, options) {
+    const defaultOptions = {indexName: this.userIndex};
+    const dbOptions = Object.assign({}, defaultOptions, options);
+    return this.allBy('userId', userId, dbOptions);
+  }
+
   static incrementBounces(hash, count = 1) {
     debug('= Report.incrementBounces', hash);
     return this.increment('bouncesCount', count, hash);
