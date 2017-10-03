@@ -83,7 +83,7 @@ class Campaign extends Model {
         sentAt: Joi.number(),
         createdAt: Joi.number(),
         scheduledAt: Joi.number(),
-        status: Joi.string().regex(/^scheduled|draft$/).required(),
+        status: Joi.string().regex(/^scheduled|draft|PaymentGatewayError*/).required(),
         isUpToDate: Joi.boolean(),
         template: Joi.string(),
         archived: Joi.boolean()
