@@ -41,6 +41,17 @@ describe('Campaign', () => {
     status: 'draft',
     archived: false
   };
+  const readyToSentCampaign3 = {
+    userId: 'user-id',
+    body: 'a-body',
+    subject: 'a-subject',
+    segmentId: 'a-seg',
+    senderId: 'a-sender',
+    name: 'some-name',
+    id: 'some-id',
+    status: 'PaymentGatewayError. Insufficient funds',
+    archived: false
+  };
   const incompleteCampaign = {
     userId: 'user-id',
     body: 'a-body',
@@ -53,6 +64,17 @@ describe('Campaign', () => {
     subject: 'a-subject',
     senderId: 'a-sender',
     listIds: []
+  };
+  const campaignWithWrongStatus = {
+    userId: 'user-id',
+    body: 'a-body',
+    subject: 'a-subject',
+    segmentId: 'a-seg',
+    senderId: 'a-sender',
+    name: 'some-name',
+    id: 'some-id',
+    status: 'PaymentError',
+    archived: false
   };
 
   before(() => {
@@ -180,11 +202,13 @@ describe('Campaign', () => {
     it('succeds if all required fields are valid', () => {
       expect(Campaign.isValidToBeSent(readyToSentCampaign)).to.be.true;
       expect(Campaign.isValidToBeSent(readyToSentCampaign2)).to.be.true;
+      expect(Campaign.isValidToBeSent(readyToSentCampaign3)).to.be.true;
     });
 
     it('fails if required fields are missing', () => {
       expect(Campaign.isValidToBeSent(incompleteCampaign)).to.be.false;
       expect(Campaign.isValidToBeSent(incompleteCampaignWithEmptyList)).to.be.false;
+      expect(Campaign.isValidToBeSent(campaignWithWrongStatus)).to.be.false;
     });
 
     it('fails if the status is not draft', () => {
