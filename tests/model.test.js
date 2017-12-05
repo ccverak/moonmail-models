@@ -582,6 +582,18 @@ describe('Model', () => {
         }
       }
     });
+
+    it('deletes an attribute if null was passed as its value', () => {
+      const params = {
+        someAttribute: 'some value',
+        anotherAttribute: 'another value',
+        toBeDeleted: null
+      };
+      params[Model.hashKey] = 'some value';
+      params[Model.rangeKey] = 'some value';
+      const attributeUpdates = Model._buildAttributeUpdates(params);
+      expect(attributeUpdates.toBeDeleted).to.deep.equal({ Action: 'DELETE' });
+    });
   });
 
   describe('#_buildOptions', () => {
