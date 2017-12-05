@@ -496,10 +496,15 @@ class Model {
     const attrUpdates = {};
     for (let key in params) {
       if (key !== this.hashKey && key !== this.rangeKey) {
-        attrUpdates[key] = {
-          Action: 'PUT',
-          Value: params[key]
-        };
+        const value = params[key];
+        if (value === null) {
+          attrUpdates[key] = { Action: 'DELETE' };
+        } else {
+          attrUpdates[key] = {
+            Action: 'PUT',
+            Value: value
+          };
+        }
       }
     }
     return attrUpdates;
