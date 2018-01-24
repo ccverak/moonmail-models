@@ -4,6 +4,7 @@ import moment from 'moment';
 import base64url from 'base64-url';
 import deepAssign from 'deep-assign';
 import omitEmpty from 'omit-empty';
+import Promise from 'bluebird';
 import { debug } from './../logger';
 
 const dynamoConfig = {
@@ -11,7 +12,18 @@ const dynamoConfig = {
 };
 const db = new DynamoDB.DocumentClient(dynamoConfig);
 
-class Model {
+
+function flattenArray(array) {
+  return [].concat.apply([], array);
+}
+
+function chunkArray(array, chunkSize) {
+  return Array(Math.ceil(array.length / chunkSize))
+    .fill()
+    .map((_, i) => array.slice(i * chunkSize, i * chunkSize + chunkSize));
+}
+
+class BaseModel {
 
   static save(item) {
     debug('= Model.save', item);
@@ -24,13 +36,29 @@ class Model {
     return this._client('put', itemParams);
   }
 
+  static create(item, validationOptions = {}) {
+    return this.validate(this.createSchema, item, validationOptions)
+      .then(createParams => this.save(createParams)
+        .then(() => createParams));
+  }
+
+  static batchCreate(items) {
+    return Promise.resolve(chunkArray(items, 25))
+      .then(itemChunks => Promise.map(itemChunks, itms => this.saveAll(itms), { concurrency: 1 }))
+      .then(resultsArray => flattenArray(resultsArray));
+  }
+
   static saveAll(items) {
     debug('= Model.saveAll', items);
-    const itemsParams = { RequestItems: {} };
-    itemsParams.RequestItems[this.tableName] = items.map(item => {
-      return { PutRequest: { Item: omitEmpty(item) } };
-    });
-    return this._client('batchWrite', itemsParams);
+    if (items.length === 0) return Promise.resolve([]);
+    return Promise.map(items, item => this.validate(this.createSchema, item))
+      .then((validItems) => {
+        const itemsParams = { RequestItems: {} };
+        itemsParams.RequestItems[this.tableName] = validItems.map(item => {
+          return { PutRequest: { Item: omitEmpty(item) } };
+        });
+        return this._client('batchWrite', itemsParams);
+      });
   }
 
   static deleteAll(keys) {
@@ -60,6 +88,14 @@ class Model {
       })
         .catch(err => reject(err));
     });
+  }
+
+  static find(hash, range, options = {}) {
+    return this.get(hash, range, options)
+      .then((result) => {
+        if (Object.keys(result).length === 0) return Promise.reject(new Error('ItemNotFound'));
+        return result;
+      });
   }
 
   static _buildOptions(options) {
@@ -176,17 +212,19 @@ class Model {
   }
 
   static update(params, hash, range) {
-    return new Promise((resolve, reject) => {
-      debug('= Model.update', hash, range, JSON.stringify(params));
-      const dbParams = {
-        TableName: this.tableName,
-        Key: this._buildKey(hash, range),
-        AttributeUpdates: this._buildAttributeUpdates(params),
-        ReturnValues: 'ALL_NEW'
-      };
-      this._client('update', dbParams).then(result => resolve(result.Attributes))
-        .catch(err => reject(err));
-    });
+    debug('= Model.update', hash, range, JSON.stringify(params));
+    if (Object.keys(params).length === 0) return Promise.reject(new Error('EmptyPayload'));
+    return this.validate(this.updateSchema, params)
+      .then(updateParams => {
+        const dbParams = {
+          TableName: this.tableName,
+          Key: this._buildKey(hash, range),
+          AttributeUpdates: this._buildAttributeUpdates(updateParams),
+          ReturnValues: 'ALL_NEW'
+        };
+        return this._client('update', dbParams)
+          .then(result => result.Attributes);
+      });
   }
 
   static delete(hash, range) {
@@ -452,15 +490,29 @@ class Model {
     return false;
   }
 
+  static get createSchema() {
+    return null;
+  }
+
+  static get updateSchema() {
+    return null;
+  }
+
   static isValid(object, options = {}) {
-    debug('= Model.isValid');
-    return this._validateSchema(this.schema, object, options);
+    const schema = this.schema || this.createSchema;
+    if (!schema) return true;
+    return this._validateSchema(schema, object, options);
   }
 
   static _validateSchema(schema, model, options = {}) {
     if (!this.schema) return true;
     const result = Joi.validate(model, schema, options);
     return !result.error;
+  }
+
+  static validate(schema, item, options = {}) {
+    if (!schema) return Promise.resolve(item);
+    return Joi.validate(item, schema, options);
   }
 
   static _buildKey(hash, range) {
@@ -541,4 +593,4 @@ class Model {
 
 }
 
-module.exports.Model = Model;
+module.exports.BaseModel = BaseModel;

@@ -6,15 +6,36 @@ const awsMock = require('aws-sdk-mock');
 const AWS = require('aws-sdk');
 import * as sinon from 'sinon';
 import * as sinonAsPromised from 'sinon-as-promised';
-import { Model } from '../src/models/model';
+import { BaseModel } from '../src/models/base_model';
 import Joi from 'joi';
 import base64url from 'base64-url';
 import omitEmpty from 'omit-empty';
+import moment from 'moment';
+import cuid from 'cuid';
 
 chai.use(chaiThings);
 chai.use(chaiAsPromised);
 
-describe('Model', () => {
+class EmptyModel extends BaseModel { }
+
+class ValidModel extends BaseModel {
+  static get createSchema() {
+    return Joi.object({
+      id: Joi.string().default(cuid()),
+      email: Joi.string().required().email(),
+      createdAt: Joi.number().default(moment().unix())
+    });
+  }
+
+  static get updateSchema() {
+    return Joi.object({
+      email: Joi.string().required().email(),
+      updatedAt: Joi.number().default(1111111)
+    });
+  }
+}
+
+describe('BaseModel', () => {
   let db;
   const validTable = 'valid-table';
   const retryableTable = 'retriable-table';
@@ -41,14 +62,14 @@ describe('Model', () => {
       }
     });
     db = new AWS.DynamoDB.DocumentClient();
-    sinon.stub(Model, '_db').returns(db);
+    sinon.stub(BaseModel, '_db').returns(db);
   });
 
   describe('#_client()', () => {
     it('calls the DynamoDB specified method and passes the params', (done) => {
       const method = 'put';
       const params = { TableName: 'my-table', Item: { id: '123' } };
-      Model._client(method, params).then(() => {
+      BaseModel._client(method, params).then(() => {
         const dbMethod = db[method];
         const dbArgs = dbMethod.lastCall.args;
         expect(dbMethod).to.have.been.called;
@@ -59,7 +80,7 @@ describe('Model', () => {
 
     context('withouth TableName', () => {
       it('rejects the promise', (done) => {
-        const clientPromise = Model._client('put', {});
+        const clientPromise = BaseModel._client('put', {});
         expect(clientPromise).to.be.rejected.and.notify(done);
       });
     });
@@ -69,16 +90,16 @@ describe('Model', () => {
 
     context('when there are unprocessed items', () => {
       before(() => {
-        clientSpy = sinon.spy(Model, '_client');
-        retryDelayStub = sinon.stub(Model, 'retryDelay', { get: () => 1.005 });
+        clientSpy = sinon.spy(BaseModel, '_client');
+        retryDelayStub = sinon.stub(BaseModel, 'retryDelay', { get: () => 1.005 });
       });
 
       it('retries the function up to maxRetries', (done) => {
         const params = { RequestItems: {} };
         params.RequestItems[retryableTable] = {};
-        Model._client('batchWrite', params).then((res) => {
-          expect(Model._client.callCount).to.equal(Model.maxRetries + 1);
-          const secondCallParams = Model._client.secondCall.args[1];
+        BaseModel._client('batchWrite', params).then((res) => {
+          expect(BaseModel._client.callCount).to.equal(BaseModel.maxRetries + 1);
+          const secondCallParams = BaseModel._client.secondCall.args[1];
           expect(secondCallParams.RequestItems).to.deep.equal(res.UnprocessedItems);
           done();
         });
@@ -92,14 +113,14 @@ describe('Model', () => {
 
     context('when there aren\'t unprocessed items', () => {
       before(() => {
-        clientSpy = sinon.spy(Model, '_client');
+        clientSpy = sinon.spy(BaseModel, '_client');
       });
 
       it('retries the function up to maxRetries', (done) => {
         const params = { RequestItems: {} };
         params.RequestItems[validTable] = {};
-        Model._client('batchWrite', params).then((res) => {
-          expect(Model._client).to.be.calledOnce;
+        BaseModel._client('batchWrite', params).then((res) => {
+          expect(BaseModel._client).to.be.calledOnce;
           expect(res).to.deep.equal({});
           done();
         })
@@ -129,20 +150,20 @@ describe('Model', () => {
     let schemaStub;
 
     before(() => {
-      clientStub = sinon.stub(Model, '_client');
+      clientStub = sinon.stub(BaseModel, '_client');
       clientStub.resolves('ok');
       clientStub.withArgs('query').resolves({ Items: items, LastEvaluatedKey: lastEvaluatedKey });
       clientStub.withArgs('get').resolves({ Item: item });
-      tNameStub = sinon.stub(Model, 'tableName', { get: () => tableName });
-      hashStub = sinon.stub(Model, 'hashKey', { get: () => hashKey });
-      rangeStub = sinon.stub(Model, 'rangeKey', { get: () => rangeKey });
+      tNameStub = sinon.stub(BaseModel, 'tableName', { get: () => tableName });
+      hashStub = sinon.stub(BaseModel, 'hashKey', { get: () => hashKey });
+      rangeStub = sinon.stub(BaseModel, 'rangeKey', { get: () => rangeKey });
     });
 
     describe('#get', () => {
       context('only hash key was provided', () => {
         it('calls the DynamoDB get method with correct params', (done) => {
-          Model.get(hashValue).then((result) => {
-            const args = Model._client.lastCall.args;
+          BaseModel.get(hashValue).then((result) => {
+            const args = BaseModel._client.lastCall.args;
             expect(args[0]).to.equal('get');
             expect(args[1]).to.have.property('TableName', tableName);
             expect(args[1]).to.have.deep.property(`Key.${hashKey}`, hashValue);
@@ -154,8 +175,8 @@ describe('Model', () => {
 
       context('range key was provided', () => {
         it('calls the DynamoDB get method with correct params', (done) => {
-          Model.get(hashValue, rangeValue).then(() => {
-            const args = Model._client.lastCall.args;
+          BaseModel.get(hashValue, rangeValue).then(() => {
+            const args = BaseModel._client.lastCall.args;
             expect(args[0]).to.equal('get');
             expect(args[1]).to.have.property('TableName', tableName);
             expect(args[1]).to.have.deep.property(`Key.${hashKey}`, hashValue);
@@ -169,13 +190,13 @@ describe('Model', () => {
         it('calls the DynamoDB get method with correct params', (done) => {
           const fields = ['attr1', 'attr2'];
           const options = { fields: fields.join(','), include_fields: true };
-          Model.get(hashValue, rangeValue, options).then(() => {
-            const args = Model._client.lastCall.args;
+          BaseModel.get(hashValue, rangeValue, options).then(() => {
+            const args = BaseModel._client.lastCall.args;
             expect(args[0]).to.equal('get');
             expect(args[1]).to.have.property('TableName', tableName);
             expect(args[1]).to.have.deep.property(`Key.${hashKey}`, hashValue);
             expect(args[1]).to.have.deep.property(`Key.${rangeKey}`, rangeValue);
-            const dbOptions = Model._buildOptions(options);
+            const dbOptions = BaseModel._buildOptions(options);
             for (let key in dbOptions) {
               expect(args[1][key]).to.deep.equal(dbOptions[key]);
             }
@@ -188,8 +209,8 @@ describe('Model', () => {
         it('calls the DynamoDB get method with correct params', done => {
           const field = 'someAttribute';
           const options = { fields: field, include_fields: false };
-          Model.get(hashValue, rangeValue, options).then(result => {
-            const args = Model._client.lastCall.args;
+          BaseModel.get(hashValue, rangeValue, options).then(result => {
+            const args = BaseModel._client.lastCall.args;
             expect(args[0]).to.equal('get');
             expect(args[1]).to.have.property('TableName', tableName);
             expect(args[1]).to.have.deep.property(`Key.${hashKey}`, hashValue);
@@ -205,13 +226,13 @@ describe('Model', () => {
       const value = 'value';
 
       it('calls the DynamoDB query method with correct params', (done) => {
-        Model.allBy(null, value).then((result) => {
-          const args = Model._client.lastCall.args;
+        BaseModel.allBy(null, value).then((result) => {
+          const args = BaseModel._client.lastCall.args;
           expect(args[0]).to.equal('query');
           expect(args[1]).to.have.property('TableName', tableName);
           expect(args[1]).to.have.property('KeyConditionExpression', '#hkey = :hvalue');
           expect(args[1]).not.to.have.property('IndexName');
-          expect(args[1]).to.have.deep.property('ExpressionAttributeNames.#hkey', Model.hashKey);
+          expect(args[1]).to.have.deep.property('ExpressionAttributeNames.#hkey', BaseModel.hashKey);
           expect(args[1]).to.have.deep.property('ExpressionAttributeValues.:hvalue', value);
           expect(result).to.have.property('items');
           expect(result).to.have.property('nextPage', nextPage);
@@ -222,8 +243,8 @@ describe('Model', () => {
       context('when the nexPage param was provided', () => {
         it('includes the ExclusiveStartKey in the query', (done) => {
           const page = nextPage;
-          Model.allBy(null, value, { page }).then(() => {
-            const args = Model._client.lastCall.args;
+          BaseModel.allBy(null, value, { page }).then(() => {
+            const args = BaseModel._client.lastCall.args;
             expect(args[1].ExclusiveStartKey).to.deep.equal(lastEvaluatedKey);
             done();
           });
@@ -234,15 +255,15 @@ describe('Model', () => {
         it('calls the DynamoDB get method with correct params', (done) => {
           const attributes = ['attr1', 'attr2'];
           const options = { fields: attributes.join(','), include_fields: true };
-          Model.allBy(null, value, options).then(result => {
-            const args = Model._client.lastCall.args;
+          BaseModel.allBy(null, value, options).then(result => {
+            const args = BaseModel._client.lastCall.args;
             expect(args[0]).to.equal('query');
             expect(args[1]).to.have.property('TableName', tableName);
             expect(args[1]).to.have.property('KeyConditionExpression', '#hkey = :hvalue');
             expect(args[1]).not.to.have.property('IndexName');
-            expect(args[1]).to.have.deep.property('ExpressionAttributeNames.#hkey', Model.hashKey);
+            expect(args[1]).to.have.deep.property('ExpressionAttributeNames.#hkey', BaseModel.hashKey);
             expect(result).to.have.property('items');
-            const dbOptions = Model._buildOptions(options);
+            const dbOptions = BaseModel._buildOptions(options);
             for (let key in dbOptions) {
               expect(args[1][key]).to.deep.contain(dbOptions[key]);
             }
@@ -255,13 +276,13 @@ describe('Model', () => {
         it('filters the result', done => {
           const fields = ['anAttribute', 'anotherAttribute'];
           const options = { fields: fields.join(','), include_fields: false };
-          Model.allBy(null, value, options).then(result => {
-            const args = Model._client.lastCall.args;
+          BaseModel.allBy(null, value, options).then(result => {
+            const args = BaseModel._client.lastCall.args;
             expect(args[0]).to.equal('query');
             expect(args[1]).to.have.property('TableName', tableName);
             expect(args[1]).to.have.property('KeyConditionExpression', '#hkey = :hvalue');
             expect(args[1]).not.to.have.property('IndexName');
-            expect(args[1]).to.have.deep.property('ExpressionAttributeNames.#hkey', Model.hashKey);
+            expect(args[1]).to.have.deep.property('ExpressionAttributeNames.#hkey', BaseModel.hashKey);
             expect(result).to.have.property('items');
             result.items.forEach(item => {
               fields.forEach(field => expect(item).not.to.have.property(field));
@@ -279,13 +300,13 @@ describe('Model', () => {
         options.range.gt[rkey] = rvalue;
 
         it('calls the DynamoDB query method with correct params', (done) => {
-          Model.allBy(null, value, options).then((result) => {
-            const args = Model._client.lastCall.args;
+          BaseModel.allBy(null, value, options).then((result) => {
+            const args = BaseModel._client.lastCall.args;
             expect(args[0]).to.equal('query');
             expect(args[1]).to.have.property('TableName', tableName);
             expect(args[1]).to.have.property('KeyConditionExpression', '#hkey = :hvalue AND #rkey > :rvalue');
             expect(args[1]).not.to.have.property('IndexName');
-            expect(args[1]).to.have.deep.property('ExpressionAttributeNames.#hkey', Model.hashKey);
+            expect(args[1]).to.have.deep.property('ExpressionAttributeNames.#hkey', BaseModel.hashKey);
             expect(args[1]).to.have.deep.property('ExpressionAttributeNames.#rkey', rkey);
             expect(args[1]).to.have.deep.property('ExpressionAttributeValues.:hvalue', value);
             expect(args[1]).to.have.deep.property('ExpressionAttributeValues.:rvalue', rvalue);
@@ -295,11 +316,11 @@ describe('Model', () => {
         });
 
         it('should build next key for the given range key', done => {
-          Model.allBy(null, value, options).then((result) => {
-            const lastKey = Model.lastEvaluatedKey(result.nextPage);
+          BaseModel.allBy(null, value, options).then((result) => {
+            const lastKey = BaseModel.lastEvaluatedKey(result.nextPage);
             expect(lastKey).to.have.property(rkey, item[rkey])
-            expect(lastKey).to.have.property(Model.hashKey)
-            expect(lastKey).to.have.property(Model.rangeKey)
+            expect(lastKey).to.have.property(BaseModel.hashKey)
+            expect(lastKey).to.have.property(BaseModel.rangeKey)
             done();
           }).catch(done);
         });
@@ -309,13 +330,13 @@ describe('Model', () => {
         it('calls the DynamoDB query method with correct params', (done) => {
           const indexName = 'my-index';
           const options = { indexName };
-          Model.allBy(null, value, options).then(() => {
-            const args = Model._client.lastCall.args;
+          BaseModel.allBy(null, value, options).then(() => {
+            const args = BaseModel._client.lastCall.args;
             expect(args[0]).to.equal('query');
             expect(args[1]).to.have.property('TableName', tableName);
             expect(args[1]).to.have.property('KeyConditionExpression', '#hkey = :hvalue');
             expect(args[1]).to.have.property('IndexName', indexName);
-            expect(args[1]).to.have.deep.property('ExpressionAttributeNames.#hkey', Model.hashKey);
+            expect(args[1]).to.have.deep.property('ExpressionAttributeNames.#hkey', BaseModel.hashKey);
             expect(args[1]).to.have.deep.property('ExpressionAttributeValues.:hvalue', value);
             done();
           }).catch(done);
@@ -323,51 +344,51 @@ describe('Model', () => {
       });
 
       context('when recusrive option was provided', () => {
-          const firstResult = {
-            items: [{ id: 'myKey1', attr: 1 }, { id: 'myKey2', attr: 2 }],
-            nextPage: '2'
-          };
+        const firstResult = {
+          items: [{ id: 'myKey1', attr: 1 }, { id: 'myKey2', attr: 2 }],
+          nextPage: '2'
+        };
 
-          const secondResult = {
-            items: [{ id: 'myKey3', attr: 3 }, { id: 'myKey4', attr: 4 }],
-            nextPage: '3'
-          };
+        const secondResult = {
+          items: [{ id: 'myKey3', attr: 3 }, { id: 'myKey4', attr: 4 }],
+          nextPage: '3'
+        };
 
-          const lastResult = {
-            items: [{ id: 'myKey5', attr: 5 }, { id: 'myKey6', attr: 6 }]
-          };
+        const lastResult = {
+          items: [{ id: 'myKey5', attr: 5 }, { id: 'myKey6', attr: 6 }]
+        };
 
-          beforeEach(() => {
-            sinon.stub(Model, '_allBy')
-              .onFirstCall()
-              .resolves(firstResult)
-              .onSecondCall()
-              .resolves(secondResult)
-              .onThirdCall()
-              .resolves(lastResult);
-          });
+        beforeEach(() => {
+          sinon.stub(BaseModel, '_allBy')
+            .onFirstCall()
+            .resolves(firstResult)
+            .onSecondCall()
+            .resolves(secondResult)
+            .onThirdCall()
+            .resolves(lastResult);
+        });
 
-          it('iterates recursively over the pages', (done) => {
-            Model.allBy(null, value, { recursive: true }).then((results) => {
-              expect(Model._allBy).to.have.been.calledThrice;
-              expect(results).to.have.property('items');
-              expect(results.items.length).to.equal(6);
-              done();
-            }).catch(err => done(err));
-          });
+        it('iterates recursively over the pages', (done) => {
+          BaseModel.allBy(null, value, { recursive: true }).then((results) => {
+            expect(BaseModel._allBy).to.have.been.calledThrice;
+            expect(results).to.have.property('items');
+            expect(results.items.length).to.equal(6);
+            done();
+          }).catch(err => done(err));
+        });
 
-          it('iterates recursively over the pages respecting the limit', (done) => {
-            Model.allBy(null, value, { recursive: true, limit: 5 }).then((results) => {
-              expect(Model._allBy).to.have.been.calledThrice;
-              expect(results).to.have.property('items');
-              expect(results.items.length).to.equal(5);
-              done();
-            }).catch(err => done(err));
-          });
+        it('iterates recursively over the pages respecting the limit', (done) => {
+          BaseModel.allBy(null, value, { recursive: true, limit: 5 }).then((results) => {
+            expect(BaseModel._allBy).to.have.been.calledThrice;
+            expect(results).to.have.property('items');
+            expect(results.items.length).to.equal(5);
+            done();
+          }).catch(err => done(err));
+        });
 
-          afterEach(() => {
-            Model._allBy.restore();
-          });
+        afterEach(() => {
+          BaseModel._allBy.restore();
+        });
       });
     });
 
@@ -376,13 +397,13 @@ describe('Model', () => {
         const keyValue = 'id';
         const start = 1;
         const end = 2;
-        Model.allBetween(keyValue, start, end).then((result) => {
-          const args = Model._client.lastCall.args;
+        BaseModel.allBetween(keyValue, start, end).then((result) => {
+          const args = BaseModel._client.lastCall.args;
           expect(args[0]).to.equal('query');
           expect(args[1]).to.have.property('TableName', tableName);
           expect(args[1]).to.have.property('KeyConditionExpression', '#hkey = :hvalue AND #rkey BETWEEN :start AND :end');
-          expect(args[1]).to.have.deep.property('ExpressionAttributeNames.#hkey', Model.hashKey);
-          expect(args[1]).to.have.deep.property('ExpressionAttributeNames.#rkey', Model.rangeKey);
+          expect(args[1]).to.have.deep.property('ExpressionAttributeNames.#hkey', BaseModel.hashKey);
+          expect(args[1]).to.have.deep.property('ExpressionAttributeNames.#rkey', BaseModel.rangeKey);
           expect(args[1]).to.have.deep.property('ExpressionAttributeValues.:hvalue', keyValue);
           expect(args[1]).to.have.deep.property('ExpressionAttributeValues.:start', start);
           expect(args[1]).to.have.deep.property('ExpressionAttributeValues.:end', end);
@@ -396,8 +417,8 @@ describe('Model', () => {
       const key = 'key';
       const value = 'value';
       it('calls the DynamoDB query method with correct params', (done) => {
-        Model.countBy(key, value).then((result) => {
-          const args = Model._client.lastCall.args;
+        BaseModel.countBy(key, value).then((result) => {
+          const args = BaseModel._client.lastCall.args;
           expect(args[0]).to.equal('query');
           expect(args[1]).to.have.property('TableName', tableName);
           expect(args[1]).to.have.property('KeyConditionExpression', '#hkey = :hvalue');
@@ -411,8 +432,8 @@ describe('Model', () => {
     describe('#save', () => {
       it('calls the DynamoDB put method with correct params', (done) => {
         let params = { id: 'key' };
-        Model.save(params).then(() => {
-          const args = Model._client.lastCall.args;
+        BaseModel.save(params).then(() => {
+          const args = BaseModel._client.lastCall.args;
           expect(args[0]).to.equal('put');
           expect(args[1]).to.have.property('TableName', tableName);
           expect(args[1].Item).to.deep.contain(params);
@@ -422,12 +443,32 @@ describe('Model', () => {
       });
     });
 
+    describe('.create', () => {
+      const payload = { email: 'ups@example.com' };
+      before(() => {
+        // BaseModel don't return the data after saving
+        sinon.stub(BaseModel, 'save').resolves({});
+      });
+      after(() => {
+        BaseModel.save.restore();
+      });
+      it('validates and resolves accordingly', (done) => {
+        ValidModel.create(payload)
+          .then((item) => {
+            expect(item.email).to.equals(payload.email);
+            expect(item).to.have.property('createdAt');
+            expect(item).to.have.property('id');
+            done();
+          }).catch(done);
+      });
+    });
+
     describe('#saveAll', () => {
       it('calls the DynamoDB batchWrite method with correct params', (done) => {
         const items = [{ id: 'key', some: { nonEmpty: 1 } }, { id: 'key2', some: { attribute: '', nonEmpty: 1 } }];
         const nItems = items.map((i) => omitEmpty(i));
-        Model.saveAll(items).then(() => {
-          const args = Model._client.lastCall.args;
+        BaseModel.saveAll(items).then(() => {
+          const args = BaseModel._client.lastCall.args;
           const method = args[0];
           const params = args[1];
           expect(method).to.equal('batchWrite');
@@ -440,19 +481,64 @@ describe('Model', () => {
           done();
         });
       });
+      context('when all the items are valid', () => {
+        const item1 = { id: '1', email: 'ups1@example.com' };
+        const item2 = { id: '2', email: 'ups2@example.com' };
+        const item3 = { id: '3', email: 'ups3@example.com' };
+        it('validates and resolves accordingly', (done) => {
+          ValidModel.saveAll([item1, item2, item3]).then((items) => {
+            const args = BaseModel._client.lastCall.args;
+            expect(args[0]).to.equal('batchWrite');
+            const requestItems = args[1].RequestItems['my-table'];
+            expect(requestItems.length).to.equals(3);
+            const item = requestItems[0].PutRequest.Item;
+            expect(item).to.have.property('createdAt');
+            expect(item).to.have.property('id');
+            done();
+          }).catch(done);
+        });
+      });
+
+      context('when some item doesnt validate', () => {
+        it('raises an error', (done) => {
+          ValidModel.saveAll([{ email: 'ups1@' }, { id: '1', email: 'ups1@example.com' }])
+            .catch((err) => {
+              expect(err.name).to.equals('ValidationError');
+              done();
+            });
+        });
+      });
+    });
+
+    describe('.batchCreate', () => {
+      const items = Array.apply(null, { length: 50 }).map(Number.call, Number).map(i => ({ email: `example${i}@email.com` }));
+      before(() => {
+        sinon.stub(BaseModel, 'saveAll').resolves(items.slice(0, 25));
+      });
+      after(() => {
+        BaseModel.saveAll.restore();
+      });
+      it('flattens inputs and outputs and splits in batches if the length of the input is more than 25', (done) => {
+        ValidModel.batchCreate(items)
+          .then((itms) => {
+            itms.forEach(item => expect(item).to.be.a('object'));
+            expect(itms.length).to.equals(50);
+            done();
+          }).catch(done);
+      });
     });
 
     describe('#deleteAll', () => {
       it('calls the DynamoDB batchWrite method with correct params', (done) => {
         const itemsKeys = [['key1'], ['key2']];
-        Model.deleteAll(itemsKeys).then(() => {
-          const args = Model._client.lastCall.args;
+        BaseModel.deleteAll(itemsKeys).then(() => {
+          const args = BaseModel._client.lastCall.args;
           const method = args[0];
           const params = args[1];
           expect(method).to.equal('batchWrite');
           expect(params).to.have.deep.property(`RequestItems.${tableName}`);
           for (let request of params.RequestItems[tableName]) {
-            expect(request).to.have.deep.property(`DeleteRequest.Key.${Model.hashKey}`);
+            expect(request).to.have.deep.property(`DeleteRequest.Key.${BaseModel.hashKey}`);
           }
           done();
         });
@@ -462,13 +548,38 @@ describe('Model', () => {
     describe('#update', () => {
       it('calls the DynamoDB update method with correct params', (done) => {
         const params = { att: 'value', att2: 'value 2' };
-        Model.update(params, hashValue, rangeValue).then(() => {
-          const args = Model._client.lastCall.args;
+        BaseModel.update(params, hashValue, rangeValue).then(() => {
+          const args = BaseModel._client.lastCall.args;
           expect(args[0]).to.equal('update');
           expect(args[1]).to.have.property('TableName');
           expect(args[1]).to.have.property('Key');
-          expect(args[1].AttributeUpdates).to.deep.equal(Model._buildAttributeUpdates(params));
+          expect(args[1].AttributeUpdates).to.deep.equal(BaseModel._buildAttributeUpdates(params));
           done();
+        });
+      });
+      context('when the update payload is empty', () => {
+        it('raises an error', (done) => {
+          ValidModel.update({}, '1')
+            .catch((err) => {
+              expect(err).to.match(/EmptyPayload/);
+              done();
+            });
+        });
+      });
+
+      context('when the update payload exists', () => {
+        const payload = { id: '1', email: 'ups@example.com' };
+        it('validates and resolves accordingly', (done) => {
+          const params = { email: payload.email };
+          ValidModel.update(params, '1')
+            .then((item) => {
+              const args = BaseModel._client.lastCall.args;
+              expect(args[0]).to.equal('update');
+              expect(args[1]).to.have.property('TableName');
+              expect(args[1]).to.have.property('Key');
+              expect(args[1].AttributeUpdates).to.deep.equal(BaseModel._buildAttributeUpdates(Object.assign({}, params, { updatedAt: 1111111 })));
+              done();
+            }).catch(done);
         });
       });
     });
@@ -477,8 +588,8 @@ describe('Model', () => {
       it('calls the DynamoDB update method with correct params', (done) => {
         const count = 2;
         const countAttribute = 'someCount';
-        Model.increment(countAttribute, count, hashValue, rangeValue).then(() => {
-          const args = Model._client.lastCall.args;
+        BaseModel.increment(countAttribute, count, hashValue, rangeValue).then(() => {
+          const args = BaseModel._client.lastCall.args;
           expect(args[0]).to.equal('update');
           expect(args[1]).to.have.property('TableName');
           expect(args[1]).to.have.property('Key');
@@ -495,8 +606,8 @@ describe('Model', () => {
           attr1: 1,
           attr2: -2
         };
-        Model.incrementAll(hashValue, rangeValue, attrValue).then(() => {
-          const args = Model._client.lastCall.args;
+        BaseModel.incrementAll(hashValue, rangeValue, attrValue).then(() => {
+          const args = BaseModel._client.lastCall.args;
           expect(args[0]).to.equal('update');
           expect(args[1]).to.have.property('TableName');
           expect(args[1]).to.have.property('Key');
@@ -511,11 +622,31 @@ describe('Model', () => {
 
     describe('#delete', () => {
       it('calls the DynamoDB delete method with correct params', (done) => {
-        Model.delete(hashValue, rangeValue).then(() => {
-          const args = Model._client.lastCall.args;
+        BaseModel.delete(hashValue, rangeValue).then(() => {
+          const args = BaseModel._client.lastCall.args;
           expect(args[0]).to.equal('delete');
           expect(args[1]).to.have.property('TableName');
-          expect(args[1].Key).to.deep.equal(Model._buildKey(hashValue, rangeValue));
+          expect(args[1].Key).to.deep.equal(BaseModel._buildKey(hashValue, rangeValue));
+          done();
+        });
+      });
+    });
+
+    describe('#validate', () => {
+      it('skips the validation if schema is null', (done) => {
+        const emptyModel = { name: 'Some name' };
+        EmptyModel.validate(null, emptyModel)
+          .then((emptyModelResult) => {
+            expect(emptyModelResult).to.deep.equals(emptyModel);
+            done();
+          }).catch(done);
+      });
+      it('delegates to Joi.validate if the schema is not null', (done) => {
+        const validModel = { email: 'some@example.com' };
+        ValidModel.validate(Joi.object({
+          email: Joi.string().required().email()
+        }), validModel).then((validModelResult) => {
+          expect(validModelResult).to.deep.equals(validModel);
           done();
         });
       });
@@ -528,15 +659,15 @@ describe('Model', () => {
             attr1: Joi.string().required(),
             attr2: Joi.string().required()
           });
-          schemaStub = sinon.stub(Model, 'schema', { get: () => schema });
+          schemaStub = sinon.stub(BaseModel, 'schema', { get: () => schema });
         });
 
         it('succeeds if all required fields are valid', () => {
-          expect(Model.isValid(validModel)).to.be.true;
+          expect(BaseModel.isValid(validModel)).to.be.true;
         });
 
         it('fails if required fields are missing', () => {
-          expect(Model.isValid(invalidModel)).to.be.false;
+          expect(BaseModel.isValid(invalidModel)).to.be.false;
         });
 
         after(() => {
@@ -546,11 +677,11 @@ describe('Model', () => {
 
       context('when not using validation', () => {
         before(() => {
-          schemaStub = sinon.stub(Model, 'schema', { get: () => null });
+          schemaStub = sinon.stub(BaseModel, 'schema', { get: () => null });
         });
 
         it('succeeds if no validation schema is defined', () => {
-          expect(Model.isValid({ some: 'object' })).to.be.true;
+          expect(BaseModel.isValid({ some: 'object' })).to.be.true;
         });
 
         after(() => {
@@ -559,8 +690,39 @@ describe('Model', () => {
       });
     });
 
+    describe('.find', () => {
+      context('when the searched item exists', () => {
+        before(() => {
+          sinon.stub(BaseModel, 'get').resolves({ id: '1' });
+        });
+        after(() => {
+          BaseModel.get.restore();
+        });
+        it('returns it', (done) => {
+          ValidModel.find('1').then((item) => {
+            expect(item).to.deep.equals({ id: '1' });
+            done();
+          }).catch(done);
+        });
+      });
+      context('when the searched item doesnt exist', () => {
+        before(() => {
+          sinon.stub(BaseModel, 'get').resolves({});
+        });
+        after(() => {
+          BaseModel.get.restore();
+        });
+        it('raises an error', (done) => {
+          ValidModel.find(1).catch((err) => {
+            expect(err).to.match(/ItemNotFound/);
+            done();
+          });
+        });
+      });
+    });
+
     after(() => {
-      Model._client.restore();
+      BaseModel._client.restore();
       tNameStub.restore();
       hashStub.restore();
       rangeStub.restore();
@@ -570,11 +732,11 @@ describe('Model', () => {
   describe('#_buildAttributeUpdates()', () => {
     it('returns a correct AttributeUpdates object', () => {
       const params = { someAttribute: 'some value', anotherAttribute: 'another value' };
-      params[Model.hashKey] = 'some value';
-      params[Model.rangeKey] = 'some value';
-      const attributeUpdates = Model._buildAttributeUpdates(params);
+      params[BaseModel.hashKey] = 'some value';
+      params[BaseModel.rangeKey] = 'some value';
+      const attributeUpdates = BaseModel._buildAttributeUpdates(params);
       for (let key in params) {
-        if (key === Model.hashKey || key === Model.rangeKey) {
+        if (key === BaseModel.hashKey || key === BaseModel.rangeKey) {
           expect(attributeUpdates).not.to.have.property(key);
         } else {
           expect(attributeUpdates).to.have.deep.property(`${key}.Action`, 'PUT');
@@ -589,9 +751,9 @@ describe('Model', () => {
         anotherAttribute: 'another value',
         toBeDeleted: null
       };
-      params[Model.hashKey] = 'some value';
-      params[Model.rangeKey] = 'some value';
-      const attributeUpdates = Model._buildAttributeUpdates(params);
+      params[BaseModel.hashKey] = 'some value';
+      params[BaseModel.rangeKey] = 'some value';
+      const attributeUpdates = BaseModel._buildAttributeUpdates(params);
       expect(attributeUpdates.toBeDeleted).to.deep.equal({ Action: 'DELETE' });
     });
   });
@@ -601,7 +763,7 @@ describe('Model', () => {
       it('returns the correct project expression and attribute names', done => {
         const fields = ['attr1', 'attr2'];
         const options = { fields: fields.join(','), include_fields: true };
-        const dbOptions = Model._buildOptions(options);
+        const dbOptions = BaseModel._buildOptions(options);
         const projExpression = fields.map(attr => `#${attr}`).join(',');
         expect(dbOptions).to.have.property('ProjectionExpression', projExpression);
         expect(dbOptions).to.have.deep.property(`ExpressionAttributeNames.#${fields[0]}`, fields[0]);
@@ -616,7 +778,7 @@ describe('Model', () => {
         const name = 'david';
         const email = 'da';
         const options = { filters: { status: { eq: status }, name: { ne: name }, email: { bw: email } } };
-        const dbOptions = Model._buildOptions(options);
+        const dbOptions = BaseModel._buildOptions(options);
         const filterExpression = '#status = :status AND #name <> :name AND begins_with(#email, :email)';
         expect(dbOptions).to.have.property('FilterExpression', filterExpression);
         expect(dbOptions).to.have.deep.property('ExpressionAttributeNames.#status', 'status');
@@ -638,7 +800,7 @@ describe('Model', () => {
         const field3 = 'field3';
         const item = { field1, field2, field3 };
         const options = { fields: `${field1},${field2}`, include_fields: false };
-        const refinedResult = Model._refineItem(item, options);
+        const refinedResult = BaseModel._refineItem(item, options);
         expect(refinedResult).to.have.property(field3, field3);
         expect(refinedResult).not.to.have.property(field1);
         expect(refinedResult).and.not.to.have.property(field2);
@@ -656,7 +818,7 @@ describe('Model', () => {
         const item = { field1, field2, field3 };
         const items = Array(5).fill().map(() => item);
         const options = { fields: `${field1},${field2}`, include_fields: false };
-        const refinedResult = Model._refineItems(items, options);
+        const refinedResult = BaseModel._refineItems(items, options);
         refinedResult.forEach(refinedItem => {
           expect(refinedItem).not.to.have.property(field1);
           expect(refinedItem).not.to.have.property(field2);
